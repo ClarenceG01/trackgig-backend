@@ -1,7 +1,11 @@
 import { Router } from "express";
-import { register, verifyEmail } from "../controllers/user.js";
+import { register, verifyOtp, resendOtp } from "../controllers/user.js";
 
 export const userRoute = Router();
 
 userRoute.post("/register", register);
-userRoute.get("/verify", verifyEmail);
+userRoute.post("/verify", verifyOtp);
+userRoute.post('/resend-otp', resendOtp);
+userRoute.get("/test", (req, res) => {
+  res.status(200).json({ message: "Test route is working!" });
+});

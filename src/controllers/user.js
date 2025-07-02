@@ -2,10 +2,12 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { userModel } from "../models/user.js";
 import { sendVerificationMail } from "../utils/sendEmail.js";
+import generateOtp from "../utils/generateOtp.js";
+import jwt from "jsonwebtoken";
 
 export async function register(req, res) {
   try {
-    const { name, email, password } = req.body;
+    const { username, email, password } = req.body;
     // check if user exists
     const user = await userModel.findOne({ email });
     if (user) {
@@ -15,47 +17,73 @@ export async function register(req, res) {
     }
     // create hashed pwd
     const hashedPwd = await bcrypt.hash(password, 10);
-    // create verification token
-    const verificationToken = crypto.randomBytes(32).toString("hex");
+
+    const { otp, signedOtp } = generateOtp();
+    // send verification email with OTP
+    await sendVerificationMail(email, otp);
     const newUser = new userModel({
-      name,
+      name: username,
       email,
       password: hashedPwd,
       isVerified: false,
-      verificationToken,
+      otpCode: signedOtp,
     });
     await newUser.save();
-
-    // send verification email
-    const url = `${process.env.BASE_URL}users/verify?token=${verificationToken}`;
-    await sendVerificationMail(email, url);
     res.status(200).json({ message: "registered successfully" });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Server error" });
   }
 }
-export async function verifyEmail(req, res) {
+export async function verifyOtp(req, res) {
   try {
-    const { token } = req.query;
-
-    if (!token) {
-      return res.status(400).json({ message: "Token is missing" });
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+    const foundUser = await userModel.findOne({ email });
+    const decryptedOtp = jwt.verify(foundUser.otpCode, process.env.JWT_SECRET);
+    if (
+      decryptedOtp.otp !== Number(otp.trim()) ||
+      decryptedOtp.exp * 1000 < Date.now()
+    ) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
-    const user = await userModel.findOne({ verificationToken: token });
+    foundUser.isVerified = true;
+    foundUser.otpCode = null;
+    await foundUser.save();
 
-    if (!user) {
-      return res.status(400).json({ message: "Invalid or expired token" });
-    }
-
-    user.isVerified = true;
-    user.verificationToken = null;
-    await user.save();
-
-    res.status(200).json({ message: "Account verified successfully!" });
+    res.status(200).json({ message: "Email verified successfully" });
   } catch (error) {
-    console.error("Error in verifyEmail:", error);
+    console.log(error);
+    if (error.message.includes("jwt expired")) {
+      return res
+        .status(400)
+        .json({ message: "OTP has expired, please request a new one" });
+    }
     return res.status(500).json({ message: "Server error" });
+  }
+}
+export async function resendOtp(req, res) {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+    const foundUser = await userModel.findOne({ email });
+    if (!foundUser || foundUser.isVerified) {
+      return res
+        .status(400)
+        .json({ message: "User not found or already verified" });
+    }
+    const { otp, signedOtp } = generateOtp();
+    await sendVerificationMail(email, otp);
+    foundUser.otpCode = signedOtp;
+    await foundUser.save();
+    res.status(200).json({ message: "OTP resent successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Server error" });
   }
 }
