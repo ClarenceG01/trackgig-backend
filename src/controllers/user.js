@@ -87,3 +87,32 @@ export async function resendOtp(req, res) {
     res.status(500).json({ message: "Server error" });
   }
 }
+export async function login(req, res) {
+  const { email, password } = req.body;
+  try {
+    const foundUser = await userModel.findOne({ email });
+    if (!foundUser) {
+      return res.status(400).send({ message: "User not found" });
+    }
+    const passwordMatch = await bcrypt.compare(password, foundUser.password);
+    if (!passwordMatch) {
+      return res.status(400).send({ message: "Incorrect password" });
+    }
+    const token = jwt.sign(
+      {
+        name: foundUser.name,
+        email: foundUser.email,
+      },
+      process.env.JWT_SECRET
+    );
+    res
+      .cookie("token", token, {
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000,
+      })
+      .status(200)
+      .send({ message: "Login successfull" });
+  } catch (error) {
+    return res.status(500).send({ message: "Server error" });
+  }
+}
