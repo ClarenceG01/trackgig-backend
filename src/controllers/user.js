@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { userModel } from "../models/user.js";
-import { sendVerificationMail } from "../utils/sendEmail.js";
+import { resendOtpEmail, sendVerificationMail } from "../utils/sendEmail.js";
 import generateOtp from "../utils/generateOtp.js";
 import jwt from "jsonwebtoken";
 
@@ -47,7 +47,7 @@ export async function verifyOtp(req, res) {
       decryptedOtp.otp !== Number(otp.trim()) ||
       decryptedOtp.exp * 1000 < Date.now()
     ) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
+      return res.status(400).json({ message: "Invalid or expired OTP, request new OTP" });
     }
 
     foundUser.isVerified = true;
@@ -78,7 +78,7 @@ export async function resendOtp(req, res) {
         .json({ message: "User not found or already verified" });
     }
     const { otp, signedOtp } = generateOtp();
-    await sendVerificationMail(email, otp);
+    await resendOtpEmail(email, otp);
     foundUser.otpCode = signedOtp;
     await foundUser.save();
     res.status(200).json({ message: "OTP resent successfully" });
@@ -90,14 +90,24 @@ export async function resendOtp(req, res) {
 export async function login(req, res) {
   const { email, password } = req.body;
   try {
+    // check if user exists
     const foundUser = await userModel.findOne({ email });
     if (!foundUser) {
       return res.status(400).send({ message: "User not found" });
     }
+    // check if password is correct
     const passwordMatch = await bcrypt.compare(password, foundUser.password);
     if (!passwordMatch) {
       return res.status(400).send({ message: "Incorrect password" });
     }
+    // check if user is verified
+    if (!foundUser.isVerified) {
+      return res.status(401).json({
+        message: "Email not verified, request otp",
+        status: "not_verified",
+      });
+    }
+    // create JWT token if the 3 above checks pass
     const token = jwt.sign(
       {
         name: foundUser.name,
@@ -105,13 +115,22 @@ export async function login(req, res) {
       },
       process.env.JWT_SECRET
     );
-    res
+    // set the token in a cookie
+    return res
       .cookie("token", token, {
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000,
       })
       .status(200)
-      .send({ message: "Login successfull" });
+      .json({
+        message: "Login successful",
+        user: {
+          name: foundUser.name,
+          email: foundUser.email,
+          isVerified: foundUser.isVerified,
+          id: foundUser._id.toString(),
+        },
+      });
   } catch (error) {
     return res.status(500).send({ message: "Server error" });
   }
