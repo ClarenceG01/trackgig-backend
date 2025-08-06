@@ -1,7 +1,8 @@
 import express from "express";
 import mongoose from "mongoose";
-import { userRoute } from "./src/routes/user.js";
 import cookieParser from "cookie-parser";
+import { userRoute } from "./src/routes/user.js";
+import { gigRouter } from "./src/routes/gig.js";
 
 const app = express();
 const port = process.env.PORT || 9000;
@@ -13,6 +14,7 @@ app.get("/", (req, res) => {
   res.send("Welcome to the User Management API");
 });
 app.use("/users", userRoute);
+app.use("/gigs", gigRouter);
 async function start() {
   try {
     await mongoose.connect(process.env.MONGO_URL);

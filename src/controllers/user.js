@@ -1,5 +1,4 @@
 import bcrypt from "bcrypt";
-import crypto from "crypto";
 import { userModel } from "../models/user.js";
 import { resendOtpEmail, sendVerificationMail } from "../utils/sendEmail.js";
 import generateOtp from "../utils/generateOtp.js";
@@ -112,6 +111,7 @@ export async function login(req, res) {
       {
         name: foundUser.name,
         email: foundUser.email,
+        id: foundUser._id.toString(),
       },
       process.env.JWT_SECRET
     );
