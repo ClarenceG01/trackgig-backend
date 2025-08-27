@@ -6,7 +6,7 @@ export function authenticate(req, res, next) {
   }
   jwt.verify(authCookie, process.env.JWT_SECRET, (err, user) => {
     if (err) {
-      return res.status(403).json({ message: "Forbidden" });
+      return res.status(403).json({ message: "Forbidden." });
     }
     req.user = user;
     next();

@@ -17,9 +17,6 @@ async function getUserGigs(req, res) {
 async function addGig(req, res) {
   try {
     const { clientId, title, desc, dueDate, amount } = req.body;
-    if (!title || !dueDate || !amount) {
-      return res.status(400).json({ message: "Missing required fields" });
-    }
     const userId = req.user.id;
     const newGig = new GigModel({
       userId,
