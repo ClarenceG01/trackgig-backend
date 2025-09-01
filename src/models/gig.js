@@ -6,8 +6,7 @@ const GigSchema = new mongoose.Schema({
     required: true,
   },
   clientId: {
-    // type: mongoose.Schema.Types.ObjectId,
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
     ref: "ClientModel",
     required: true,
   },

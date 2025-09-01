@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import cookieParser from "cookie-parser";
 import { userRoute } from "./src/routes/user.js";
 import { gigRouter } from "./src/routes/gig.js";
+import { clientRouter } from "./src/routes/client.js";
 
 const app = express();
 const port = process.env.PORT || 9000;
@@ -15,6 +16,7 @@ app.get("/", (req, res) => {
 });
 app.use("/users", userRoute);
 app.use("/gigs", gigRouter);
+app.use("/clients", clientRouter);
 async function start() {
   try {
     await mongoose.connect(process.env.MONGO_URL);
